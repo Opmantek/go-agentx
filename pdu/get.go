@@ -4,22 +4,14 @@
 
 package pdu
 
-import "github.com/posteo/go-agentx/value"
-
 // Get defines the pdu get packet.
 type Get struct {
-	SearchRange Range
+	Oids []ObjectIdentifier
 }
 
-// GetOID returns the oid.
-func (g *Get) GetOID() value.OID {
-	return g.SearchRange.From.GetIdentifier()
-}
-
-// SetOID sets the provided oid.
-func (g *Get) SetOID(oid value.OID) {
-	g.SearchRange.From.SetIdentifier(oid)
-}
+const (
+	REQ_OID_LIST_PAD_BYTES = 4
+)
 
 // Type returns the pdu packet type.
 func (g *Get) Type() Type {
@@ -28,13 +20,38 @@ func (g *Get) Type() Type {
 
 // MarshalBinary returns the pdu packet as a slice of bytes.
 func (g *Get) MarshalBinary() ([]byte, error) {
-	return []byte{}, nil
+	byteArr := []byte{}
+
+	for _, oid := range g.Oids {
+		oidByteArr, err := oid.MarshalBinary()
+		if err != nil {
+			return []byte{}, err
+		}
+		byteArr = append(byteArr, oidByteArr...)
+		byteArr = append(byteArr, []byte{0, 0, 0, 0}...)
+	}
+
+	return byteArr, nil
 }
 
 // UnmarshalBinary sets the packet structure from the provided slice of bytes.
 func (g *Get) UnmarshalBinary(data []byte) error {
-	if err := g.SearchRange.UnmarshalBinary(data); err != nil {
-		return err
+
+	maxLength := len(data)
+	digested := 0
+
+	for digested < maxLength {
+
+		oid := &ObjectIdentifier{}
+		err := oid.UnmarshalBinary(data[digested:])
+		if err != nil {
+			return err
+		}
+
+		g.Oids = append(g.Oids, *oid)
+
+		digested += oid.ByteSize() + REQ_OID_LIST_PAD_BYTES
 	}
+
 	return nil
 }

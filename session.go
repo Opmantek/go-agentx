@@ -134,17 +134,22 @@ func (s *Session) handle(request *pdu.HeaderPacket) *pdu.HeaderPacket {
 	case *pdu.Get:
 		if s.Handler == nil {
 			log.Printf("warning: no handler for session specified")
-			responsePacket.Variables.Add(requestPacket.GetOID(), pdu.VariableTypeNull, nil)
-		} else {
-			oid, t, v, err := s.Handler.Get(requestPacket.GetOID())
-			if err != nil {
-				log.Printf("error while handling packet: %v", err)
-				responsePacket.Error = pdu.ErrorProcessing
+			for _, oid := range requestPacket.Oids {
+				responsePacket.Variables.Add(oid.GetIdentifier(), pdu.VariableTypeNull, nil)
 			}
-			if oid == nil {
-				responsePacket.Variables.Add(requestPacket.GetOID(), pdu.VariableTypeNoSuchObject, nil)
-			} else {
-				responsePacket.Variables.Add(oid, t, v)
+		} else {
+			for _, oidInPdu := range requestPacket.Oids {
+				oid, t, v, err := s.Handler.Get(oidInPdu.GetIdentifier())
+				if err != nil {
+					log.Printf("error while handling packet: %v", err)
+					responsePacket.Error = pdu.ErrorProcessing
+				}
+
+				if oid == nil {
+					responsePacket.Variables.Add(oidInPdu.GetIdentifier(), pdu.VariableTypeNoSuchObject, nil)
+				} else {
+					responsePacket.Variables.Add(oid, t, v)
+				}
 			}
 		}
 	case *pdu.GetNext:
